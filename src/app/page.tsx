@@ -44,7 +44,7 @@ export default function Home() {
     <div className="">
       <main className="flex flex-col items-center justify-center min-h-screen gap-5">
         <div className="flex flex-col gap-2">
-          <h1 className="uppercase block text-primary text-5xl md:text-7xl italic tracking-tighter drop-shadow-[4px_4px_0px_#064200]">
+          <h1 className="uppercase block text-primary text-5xl md:text-7xl italic tracking-tighter drop-shadow-[4px_4px_0px_#064200] text-center">
             Arcade Darts
           </h1>
           <p className="font-headline text-[10px] text-primary text-center">
