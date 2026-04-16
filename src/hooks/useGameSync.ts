@@ -7,11 +7,11 @@ import { Multiplier } from '../lib/domain/game/Turn.valueObject';
 export function useGameSync(roomId: string, ably: Realtime, playerId: string, isSpectator: boolean = false) {
     const [game, setGame] = useState<Game | null>(null);
     const [players, setPlayers] = useState<{ clientId: string; playerName: string }[]>([]);
+    const [myName, setMyName] = useState<string | null>(null);
     const channelRef = useRef<any>(null);
     const snapshotInterval = useRef<NodeJS.Timeout | undefined>(undefined);
     const gameRef = useRef<Game | null>(null);
 
-    // Mantieni gameRef aggiornato
     useEffect(() => {
         gameRef.current = game;
     }, [game]);
@@ -20,19 +20,16 @@ export function useGameSync(roomId: string, ably: Realtime, playerId: string, is
         const channel = ably.channels.get(`game:${roomId}`);
         channelRef.current = channel;
 
-        // Gestione presenza
+        // Gestione presenza (aggiornata con il nome)
         channel.presence.subscribe('enter', (msg) => {
             setPlayers(prev => [...prev, { clientId: msg.clientId, playerName: msg.data.playerName }]);
         });
         channel.presence.subscribe('leave', (msg) => {
             setPlayers(prev => prev.filter(p => p.clientId !== msg.clientId));
         });
-
-        channel.presence.enter({ playerId, isSpectator, playerName: isSpectator ? `Spettatore-${playerId.slice(0,4)}` : `Giocatore-${playerId.slice(0,4)}` });
-
-        const requestSnapshot = () => {
-            channel.publish('snapshot-request', { requesterId: playerId });
-        };
+        channel.presence.subscribe('update', (msg) => {
+            setPlayers(prev => prev.map(p => p.clientId === msg.clientId ? { ...p, playerName: msg.data.playerName } : p));
+        });
 
         // Ascolta eventi di gioco
         channel.subscribe('throw', (msg) => {
@@ -52,6 +49,19 @@ export function useGameSync(roomId: string, ably: Realtime, playerId: string, is
             setGame(newGame);
         });
 
+        channel.subscribe('add-player', (msg) => {
+            if (!gameRef.current) return;
+            const { playerName } = msg.data;
+            try {
+                const newGame = gameRef.current.addPlayer(playerName);
+                setGame(newGame);
+                // Invia il nuovo snapshot a tutti
+                channel.publish('snapshot', { snapshot: newGame.snapshot });
+            } catch (err) {
+                console.warn('Add player ignored', err);
+            }
+        });
+
         channel.subscribe('snapshot-request', (msg) => {
             if (gameRef.current && msg.data.requesterId !== playerId) {
                 channel.publish('snapshot', { snapshot: gameRef.current.snapshot, forClient: msg.data.requesterId });
@@ -67,19 +77,42 @@ export function useGameSync(roomId: string, ably: Realtime, playerId: string, is
 
         const init = async () => {
             const members = await channel.presence.get();
-            const playersOnly = members.filter(m => !m.data.isSpectator);
+            const playersOnly = members.filter(m => !m.data.isSpectator && m.data.playerName);
+            
             if (playersOnly.length === 0 && !isSpectator) {
-                const newGame = Game.start(roomId, ['Giocatore 1', 'Giocatore 2'], 501);
+                // Primo giocatore: chiede il nome
+                const name = prompt('Inserisci il tuo nome:') || 'Anonimo';
+                setMyName(name);
+                channel.presence.update({ playerId, isSpectator, playerName: name });
+                // Crea partita con un solo giocatore
+                const newGame = Game.start(roomId, [{ id: playerId, name }], 501);
                 setGame(newGame);
                 channel.publish('snapshot', { snapshot: newGame.snapshot });
+            } else if (!isSpectator) {
+                // Giocatore non primo: chiede il nome e si aggiunge
+                const name = prompt('Inserisci il tuo nome:') || 'Anonimo';
+                setMyName(name);
+                channel.presence.update({ playerId, isSpectator, playerName: name });
+                // Richiedi snapshot e poi aggiungi il giocatore
+                requestSnapshot();
+                // Aspetta un attimo che arrivi lo snapshot, poi invia add-player
+                setTimeout(() => {
+                if (gameRef.current) {
+                    channel.publish('add-player', { playerName: name });
+                }
+                }, 500);
             } else {
+                // Spettatore
                 requestSnapshot();
             }
         };
 
+        const requestSnapshot = () => {
+        channel.publish('snapshot-request', { requesterId: playerId });
+        };
+
         init();
 
-        // Intervallo snapshot: usa gameRef.current per evitare stale closure
         const startSnapshotInterval = () => {
             if (snapshotInterval.current) clearInterval(snapshotInterval.current);
             snapshotInterval.current = setInterval(() => {
@@ -88,16 +121,15 @@ export function useGameSync(roomId: string, ably: Realtime, playerId: string, is
                 }
             }, 10000);
         };
-
         startSnapshotInterval();
 
         return () => {
-        if (snapshotInterval.current) clearInterval(snapshotInterval.current);
+            if (snapshotInterval.current) clearInterval(snapshotInterval.current);
             channel.presence.leave();
             channel.unsubscribe();
             channel.detach();
         };
-    }, [roomId, ably, playerId, isSpectator]); // game non serve nelle dipendenze grazie a gameRef
+    }, [roomId, ably, playerId, isSpectator]);
 
     const recordThrow = (sector: number | null, multiplier: Multiplier | null, isMiss: boolean) => {
         if (!gameRef.current || gameRef.current.winner) return;
@@ -109,5 +141,5 @@ export function useGameSync(roomId: string, ably: Realtime, playerId: string, is
         channelRef.current?.publish('end-turn', {});
     };
 
-    return { game, recordThrow, endTurn, players };
+    return { game, recordThrow, endTurn, players, myName };
 }

@@ -7,8 +7,8 @@ import { GameStateDto } from './dto/GameStateDto';
 export class GameService {
   constructor(private readonly eventBus: DomainEventBus) {}
 
-  startNewGame(roomId: string, playerNames: string[], startingScore: number = 501): Game {
-    return Game.start(roomId, playerNames, startingScore);
+  startNewGame(roomId: string, players: { id: string, name: string }[], startingScore: number = 501): Game {
+    return Game.start(roomId, players, startingScore);
   }
 
   recordThrow(game: Game, playerId: string, sector: number | null, multiplier: Multiplier): Game {

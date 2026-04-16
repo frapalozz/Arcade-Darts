@@ -32,11 +32,10 @@ export class Game extends AggregateRoot {
         this._currentPlayerIndex = randomInt(0, players.length)
     }
 
-    static start(roomId: string, playerNames: string[], startingScore: number = 501): Game {
-        const players = playerNames.map((name, idx) => 
-            new Player(`${roomId}-${idx}`, name, Score.create(startingScore))
-        );
-        return new Game(roomId, players, startingScore);
+    static start(roomId: string, players: { id: string, name: string}[], startingScore: number = 501): Game {
+        const gamePlayers = players.map(p => new Player(p.id, p.name, Score.create(startingScore)));
+        
+        return new Game(roomId, gamePlayers, startingScore);
     }
 
     static fromState(snapshot: GameSnapshot): Game {
@@ -158,6 +157,22 @@ export class Game extends AggregateRoot {
             winner: this.winner ? { id: this.winner.id, name: this.winner.name } : null,
             startingScore: this.startingScore
         };
+    }
+
+    addPlayer(name: string): Game {
+        if (this._winnerId) throw new Error('Game already finished');
+        if (this.hasStarted()) throw new Error('Game already started, cannot add players');
+
+        const newId = `${this.id}-${this.players.length}`;
+        const newPlayer = new Player(newId, name, Score.create(this.startingScore));
+        const newGame = this.clone();
+        newGame.players.push(newPlayer);
+        return newGame;
+    }
+
+    // Verifica se è stato già effettuato almeno un tiro
+    hasStarted(): boolean {
+        return this.players.some(p => p.score.getValue() !== this.startingScore);
     }
 
     private clone(): Game {
