@@ -111,8 +111,7 @@ export class Game extends AggregateRoot {
             // BUST: se negativo o uguale a 1, annulla tutto il turno
             if (newScoreValue < 0 || newScoreValue === 1) {
                 newGame._currentTurn.reset();
-                newGame.endTurn(); // fine turno senza modifica punteggio
-                return newGame;
+                return newGame.endTurn(); // fine turno senza modifica punteggio
             }
 
             const newScore = Score.create(newScoreValue);
@@ -123,13 +122,13 @@ export class Game extends AggregateRoot {
                 newGame._winnerId = player.id;
                 newGame.addEvent(new GameWonEvent(newGame.id, player.id, player.name));
             } else if (newGame._currentTurn.isComplete()) {
-                newGame.endTurn();
+                return newGame.endTurn();
             }
         } else {
             // Miss: registra evento e controlla fine turno
             newGame.addEvent(new ScoreRecordedEvent(newGame.id, playerId, null, null, 0, player.score.getValue()));
             if (newGame._currentTurn.isComplete()) {
-                newGame.endTurn();
+                return newGame.endTurn();
             }
         }
         return newGame;
