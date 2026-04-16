@@ -1,26 +1,70 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  /* Colors – prefix with --color- */
+  --color-surface-container-high: #1f2020;
+  --color-on-primary-container: #0b5800;
+  --color-on-surface-variant: #adaaaa;
+  --color-on-tertiary: #583800;
+  --color-on-tertiary-fixed-variant: #573700;
+  --color-on-primary: #0d6100;
+  --color-surface-container-lowest: #000000;
+  --color-surface-dim: #0e0e0e;
+  --color-error-container: #b92902;
+  --color-on-secondary: #400040;
+  --color-surface-bright: #2c2c2c;
+  --color-on-primary-fixed-variant: #0d6200;
+  --color-on-error: #450900;
+  --color-on-surface: #ffffff;
+  --color-surface-container-highest: #262626;
+  --color-inverse-primary: #106f00;
+  --color-on-background: #ffffff;
+  --color-surface-tint: #8eff71;
+  --color-on-tertiary-fixed: #2c1a00;
+  --color-surface-variant: #262626;
+  --color-outline-variant: #484848;
+  --color-inverse-surface: #fcf9f8;
+  --color-tertiary-fixed: #f7a511;
+  --color-tertiary: #ffb547;
+  --color-primary-fixed: #2ff801;
+  --color-on-tertiary-container: #4b2f00;
+  --color-on-secondary-fixed: #620061;
+  --color-tertiary-dim: #e69800;
+  --color-secondary-fixed-dim: #ffa6f3;
+  --color-error: #ff7351;
+  --color-on-error-container: #ffd2c8;
+  --color-primary: #8eff71;
+  --color-primary-fixed-dim: #2be800;
+  --color-on-secondary-container: #fff5f9;
+  --color-tertiary-fixed-dim: #e69800;
+  --color-secondary-fixed: #ffbdf3;
+  --color-error-dim: #d53d18;
+  --color-primary-container: #2ff801;
+  --color-surface: #0e0e0e;
+  --color-tertiary-container: #f7a511;
+  --color-primary-dim: #2be800;
+  --color-background: #0e0e0e;
+  --color-on-primary-fixed: #064200;
+  --color-secondary: #ff51fa;
+  --color-surface-container: #191a1a;
+  --color-inverse-on-surface: #565555;
+  --color-surface-container-low: #131313;
+  --color-on-secondary-fixed-variant: #920091;
+  --color-secondary-container: #a900a9;
+  --color-outline: #767575;
+  --color-secondary-dim: #ff51fa;
+
+  /* Border radius – use --radius-* */
+  --radius-DEFAULT: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-full: 9999px;
+
+  /* Font families – use --font-* */
+  --font-headline: var(--font-press-start), system-ui;
+  --font-body: var(--font-space-grotesk), sans-serif;
+  --font-label: var(--font-press-start), system-ui;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
+/* Dark mode with class – v4 supports it, but you need to define dark variants if needed */
+@custom-variant dark (&:where(.dark, .dark *));
