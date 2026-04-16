@@ -86,15 +86,12 @@ export function useGameSync(
             // e non ci sono altri giocatori, creiamo una nuova partita.
             setTimeout(() => {
                 if (!gameRef.current && !isSpectator && snapshotRequested.current) {
-                const members = channel.presence.get();
-                members.then((membersList: any[]) => {
-                    const playersOnly = membersList.filter((m: any) => !m.data.isSpectator);
-                    if (playersOnly.length === 0) {
+                    console.log("⚠️ Nessuno ha risposto, creo io la partita");
+
                     const newGame = Game.start(roomId, [{ id: playerId, name: playerName }], 501);
                     setGame(newGame);
+
                     channel.publish('snapshot', { snapshot: newGame.snapshot });
-                    }
-                }).catch(() => {});
                 }
                 snapshotRequested.current = false;
             }, 3000);
@@ -112,7 +109,7 @@ export function useGameSync(
 
         channel.presence.subscribe('enter', onEnter);
         channel.presence.subscribe('leave', onLeave);
-        channel.presence.update({ playerId, playerName, isSpectator });
+        channel.presence.enter({ playerId, playerName, isSpectator });
 
         // =====================================
         // Event Handlers

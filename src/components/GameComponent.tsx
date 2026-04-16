@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from 'react';
 import { useGameSync } from '../hooks/useGameSync';
 import { Multiplier } from '../lib/domain/game/Turn.valueObject';
-import { useRouter } from 'next/navigation';
 
 export default function GameComponent({
     roomId,
@@ -22,7 +21,6 @@ export default function GameComponent({
         isSpectator
     );
 
-    const router = useRouter();
     const [selectedSector, setSelectedSector] = useState<number | null>(null);
     const [selectedMultiplier, setSelectedMultiplier] = useState<Multiplier>(Multiplier.SINGLE);
     const [isMyTurn, setIsMyTurn] = useState(!game ? false : game.currentPlayer.id === playerId && !game.winner && !isSpectator);
@@ -33,12 +31,6 @@ export default function GameComponent({
         }
         
     }, [game, endTurn])
-
-    useEffect(() => {
-        if (game) {
-            console.log('Current player changed to:', game.currentPlayer.id);
-        }
-    }, [game?.currentPlayer.id]);
 
     if (!game) {
 
