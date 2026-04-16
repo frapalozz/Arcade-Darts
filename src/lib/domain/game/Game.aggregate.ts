@@ -7,7 +7,6 @@ import { ScoreRecordedEvent } from './events/ScoreRecorded.event';
 import { TurnChangedEvent } from './events/TurnChanged.event';
 import { GameWonEvent } from './events/GameWon.event';
 import { GameStateDto } from '../../application/game/dto/GameStateDto';
-import { randomInt } from 'crypto';
 
 export interface GameSnapshot {
     id: string;
@@ -25,11 +24,10 @@ export class Game extends AggregateRoot {
 
     private constructor(
         public readonly id: string,
-        private readonly players: Player[],
+        public readonly players: Player[],
         private readonly startingScore: number
     ) {
         super();
-        this._currentPlayerIndex = randomInt(0, players.length)
     }
 
     static start(roomId: string, players: { id: string, name: string}[], startingScore: number = 501): Game {
@@ -38,9 +36,8 @@ export class Game extends AggregateRoot {
         return new Game(roomId, gamePlayers, startingScore);
     }
 
-    static fromState(snapshot: GameSnapshot): Game {
+        static fromState(snapshot: GameSnapshot): Game {
         const game = new Game(snapshot.id, [], snapshot.startingScore);
-        // Ricostruisci giocatori
         snapshot.players.forEach(p => {
             const player = new Player(p.id, p.name, Score.create(p.score));
             game.players.push(player);
@@ -48,13 +45,17 @@ export class Game extends AggregateRoot {
         game._currentPlayerIndex = snapshot.currentPlayerIndex;
         game._currentTurn = new Turn(3);
         for (const thr of snapshot.currentTurnThrows) {
-            if(thr.isMiss) {
+            if (thr.isMiss) {
                 game._currentTurn.addMiss();
             } else {
-                game._currentTurn.addThrow(thr.sector, thr.multiplier ? thr.multiplier : Multiplier.SINGLE);
+                game._currentTurn.addThrow(thr.sector!, thr.multiplier!);
             }
         }
-            game._winnerId = snapshot.winnerId;
+        // 🔧 Se il turno è già completo, lo resettiamo (il prossimo giocatore inizierà un turno nuovo)
+        if (game._currentTurn.isComplete()) {
+            game._currentTurn.reset();
+        }
+        game._winnerId = snapshot.winnerId;
         return game;
     }
 
@@ -87,12 +88,11 @@ export class Game extends AggregateRoot {
         if (this.currentPlayer.id !== playerId) throw new Error('Not your turn');
 
         const newGame = this.clone();
-
         const player = newGame.currentPlayer;
         const turnPointsBefore = newGame._currentTurn.totalPoints();
 
-        let throwResult: Throw | null = null;  
-        
+        let throwResult: Throw | null = null;
+
         if (isMiss) {
             throwResult = newGame._currentTurn.addMiss();
         } else {
@@ -102,9 +102,9 @@ export class Game extends AggregateRoot {
         if (!throwResult) throw new Error('Turn already complete, call endTurn first');
 
         const turnPointsAfter = newGame._currentTurn.totalPoints();
-        const addedPoints = turnPointsAfter - turnPointsBefore; // sarà 0 per miss
+        const addedPoints = turnPointsAfter - turnPointsBefore;
 
-        // Se è un miss, non modifica il punteggio
+        // Gestione miss e bust unificata
         if (!isMiss && addedPoints > 0) {
             let newScoreValue = player.score.getValue() - addedPoints;
 
@@ -117,7 +117,6 @@ export class Game extends AggregateRoot {
 
             const newScore = Score.create(newScoreValue);
             player.updateScore(newScore);
-
             newGame.addEvent(new ScoreRecordedEvent(newGame.id, playerId, sector!, multiplier!, addedPoints, newScoreValue));
 
             if (newScore.isZero()) {
@@ -127,13 +126,12 @@ export class Game extends AggregateRoot {
                 newGame.endTurn();
             }
         } else {
-            // Miss: non cambia punteggio, ma registra evento (opzionale) e controlla fine turno
+            // Miss: registra evento e controlla fine turno
             newGame.addEvent(new ScoreRecordedEvent(newGame.id, playerId, null, null, 0, player.score.getValue()));
             if (newGame._currentTurn.isComplete()) {
                 newGame.endTurn();
             }
         }
-
         return newGame;
     }
 
@@ -159,11 +157,13 @@ export class Game extends AggregateRoot {
         };
     }
 
-    addPlayer(name: string): Game {
+    addPlayer(name: string, id: string): Game {
         if (this._winnerId) throw new Error('Game already finished');
+        // 🔧 Permetti l'aggiunta solo se nessun tiro è stato ancora effettuato (partita non iniziata)
         if (this.hasStarted()) throw new Error('Game already started, cannot add players');
-
-        const newId = `${this.id}-${this.players.length}`;
+        
+        // 🔧 Genera ID stabile (es. usando timestamp + nome normalizzato)
+        const newId = id ? id : `${this.id}-${Date.now()}-${name.replace(/\s/g, '')}`;
         const newPlayer = new Player(newId, name, Score.create(this.startingScore));
         const newGame = this.clone();
         newGame.players.push(newPlayer);
