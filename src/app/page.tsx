@@ -2,6 +2,7 @@
 import { Rocket, Unplug } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import slugify from 'slugify'
 
 export default function Home() {
   const [roomId, setRoomId] = useState('');
@@ -27,17 +28,29 @@ export default function Home() {
 
   const createGame = () => {
     if (!roomId.trim()) return;
-    saveNameAndNavigate(roomId.trim());
+    saveNameAndNavigate(slugify(roomId.trim(), {
+      lower: true,
+      trim: true,
+      replacement: "-"
+    }));
   };
 
   const joinGame = () => {
     if (!lobbyId.trim()) return;
-    saveNameAndNavigate(lobbyId.trim());
+    saveNameAndNavigate(slugify(lobbyId.trim(), {
+      lower: true,
+      trim: true,
+      replacement: "-"
+    }));
   };
 
   const spectator = () => {
     if (!lobbyId.trim()) return;
-    saveNameAndNavigate(lobbyId.trim(), 'spectator');
+    saveNameAndNavigate(slugify(lobbyId.trim(), {
+      lower: true,
+      trim: true,
+      replacement: "-"
+    }), 'spectator');
   };
 
   return (
