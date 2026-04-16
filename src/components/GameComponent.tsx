@@ -24,7 +24,7 @@ export default function GameComponent({
 
     const router = useRouter();
     const [selectedSector, setSelectedSector] = useState<number | null>(null);
-    const [selectedMultiplier, setSelectedMultiplier] = useState<Multiplier | null>(null);
+    const [selectedMultiplier, setSelectedMultiplier] = useState<Multiplier>(Multiplier.SINGLE);
     const [isMyTurn, setIsMyTurn] = useState(!game ? false : game.currentPlayer.id === playerId && !game.winner && !isSpectator);
 
     useEffect(() => {
@@ -52,7 +52,7 @@ export default function GameComponent({
         if (selectedSector && selectedMultiplier) {
             recordThrow(selectedSector, selectedMultiplier, false);
             setSelectedSector(null);
-            setSelectedMultiplier(null);
+            setSelectedMultiplier(Multiplier.SINGLE);
         }
     };
 
@@ -62,7 +62,7 @@ export default function GameComponent({
     };
 
     return (
-        <div className="text-white p-3 sm:p-4 max-w-6xl mx-auto">
+        <div className={`text-white p-3 sm:p-4 max-w-screen w-screen mx-auto`}>
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
                 <h1 className="text-2xl sm:text-3xl font-bold">🎯 {roomId}</h1>
@@ -74,12 +74,12 @@ export default function GameComponent({
             {/* Tabella giocatori - responsive: su mobile diventa a blocchi */}
             <div className="bg-neutral-900 rounded-lg overflow-hidden mb-6 shadow-lg">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm sm:text-base">
+                    <table className="w-full text-left text-xs sm:text-base">
                         <thead className="bg-neutral-800">
                             <tr>
-                                <th className="px-3 sm:px-4 py-2">Giocatore</th>
-                                <th className="px-3 sm:px-4 py-2">Punteggio</th>
-                                <th className="px-3 sm:px-4 py-2">Stato</th>
+                                <th className="px-3 sm:px-4 py-2">Player</th>
+                                <th className="px-3 sm:px-4 py-2 text-center">Points</th>
+                                <th className="px-3 sm:px-4 py-2 text-end">State</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -94,8 +94,8 @@ export default function GameComponent({
                                                 {isWinner && <span className="text-yellow-400 text-lg">🏆</span>}
                                             </span>
                                         </td>
-                                        <td className="px-3 sm:px-4 py-2 font-mono text-base sm:text-lg">{player.score.getValue()}</td>
-                                        <td className="px-3 sm:px-4 py-2 text-xs sm:text-sm">
+                                        <td className="px-3 sm:px-4 py-2 text-xs text-center">{player.score.getValue()}</td>
+                                        <td className="px-3 sm:px-4 py-2 text-xs sm:text-sm text-end">
                                             {isWinner ? 'Vincitore!' : (isCurrent ? '🎯 Turno' : '')}
                                         </td>
                                     </tr>
@@ -108,7 +108,7 @@ export default function GameComponent({
 
             {/* Tiri del turno corrente */}
             <div className="bg-neutral-800 p-3 rounded mb-4">
-                <h2 className="text-xs sm:text-sm uppercase text-gray-400">Turno di {game.currentPlayer.name}</h2>
+                <h2 className="text-xs uppercase text-gray-400">Turno di {game.currentPlayer.name}</h2>
                 <div className="flex flex-wrap gap-2 mt-1">
                     {game.currentTurnThrows.map((t, i) => (
                         <div key={i} className="bg-black px-2 py-1 rounded text-xs sm:text-sm font-mono">
@@ -124,11 +124,28 @@ export default function GameComponent({
                 <div className="bg-neutral-800 p-4 rounded-lg shadow-md">
                     {isMyTurn ? (
                         <>
-                            <h2 className="text-xl sm:text-2xl mb-3 text-green-400 font-bold">🎯 È il tuo turno!</h2>
+                            <h2 className="text-base mb-3 text-green-400 font-bold">🎯 È il tuo turno!</h2>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                                <div className="sm:col-span-2">
-                                    <label className="block text-xs mb-1">Settore (1-20)</label>
-                                    <input
+                                <div className="grid grid-cols-4 gap-2">
+                                    {Array.from({ length: 20 }, (_, i) => i + 1).map(n => {
+                                        const isSelected = selectedSector === n;
+
+                                        return (
+                                        <button
+                                            key={n}
+                                            onClick={() => {setSelectedSector(n); setSelectedMultiplier(Multiplier.SINGLE)}}
+                                            className={`
+                                            px-3 py-2 rounded text-sm font-bold
+                                            ${isSelected 
+                                                ? 'bg-primary text-on-primary-container' 
+                                                : 'bg-neutral-700 text-white hover:bg-neutral-600'}
+                                            `}
+                                        >
+                                            {n}
+                                        </button>
+                                        );
+                                    })}
+                                    {/*<input
                                         type="number"
                                         min="1"
                                         max="20"
@@ -136,20 +153,44 @@ export default function GameComponent({
                                         onChange={e => setSelectedSector(Number(e.target.value))}
                                         className="bg-neutral-700 text-white px-3 py-2 rounded w-full text-base"
                                         placeholder="es. 20"
-                                    />
+                                    />*/}
                                 </div>
-                                <div>
-                                    <label className="block text-xs mb-1">Moltiplicatore</label>
-                                    <select
-                                        value={selectedMultiplier || ''}
-                                        onChange={e => setSelectedMultiplier(Number(e.target.value) as Multiplier)}
-                                        className="bg-neutral-700 text-white px-3 py-2 rounded w-full text-base"
+                                <div className='grid grid-cols-2 gap-2'>
+
+                                    <button
+                                        onClick={() => setSelectedMultiplier(Multiplier.DOUBLE)}
+                                        className={`px-3 py-2 rounded ${
+                                        selectedMultiplier === Multiplier.DOUBLE ? 'bg-orange-200 text-orange-700' : 'bg-neutral-700 text-white'
+                                        }`}
                                     >
-                                        <option value="">Scegli</option>
-                                        <option value={Multiplier.SINGLE}>Singolo (x1)</option>
-                                        <option value={Multiplier.DOUBLE}>Doppio (x2)</option>
-                                        <option value={Multiplier.TRIPLE}>Triplo (x3)</option>
-                                    </select>
+                                        Double
+                                    </button>
+
+                                    <button
+                                        onClick={() => setSelectedMultiplier(Multiplier.TRIPLE)}
+                                        className={`px-3 py-2 rounded ${
+                                        selectedMultiplier === Multiplier.TRIPLE ? 'bg-primary-container text-on-primary-container' : 'bg-neutral-700 text-white'
+                                        }`}
+                                    >
+                                        Triple
+                                    </button>
+                                    <button
+                                        onClick={() => setSelectedMultiplier(Multiplier.BULLSEYE)}
+                                        className={`px-3 py-2 rounded ${
+                                        selectedMultiplier === Multiplier.BULLSEYE ? 'bg-blue-500 text-white' : 'bg-neutral-700 text-white'
+                                        }`}
+                                    >
+                                        Bull
+                                    </button>
+
+                                    <button
+                                        onClick={() => setSelectedMultiplier(Multiplier.DOUBLE_BULLSEYE)}
+                                        className={`px-3 py-2 rounded ${
+                                        selectedMultiplier === Multiplier.DOUBLE_BULLSEYE ? 'bg-blue-500 text-white' : 'bg-neutral-700 text-white'
+                                        }`}
+                                    >
+                                        Bullseye
+                                    </button>
                                 </div>
                                 <div className="flex flex-col sm:flex-row gap-2 items-stretch">
                                     <button
