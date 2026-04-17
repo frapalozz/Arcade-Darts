@@ -88,7 +88,7 @@ export default function GameComponent({
                                         </td>
                                         <td className="px-3 sm:px-4 py-2 text-xs text-center">{player.score.getValue()}</td>
                                         <td className="px-3 sm:px-4 py-2 text-xs sm:text-sm text-end">
-                                            {isWinner ? 'Vincitore!' : (isCurrent ? '🎯 Turno' : '')}
+                                            {isWinner ? '🏆' : (isCurrent ? '🎯 Turno' : '')}
                                         </td>
                                     </tr>
                                 );

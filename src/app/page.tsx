@@ -74,6 +74,7 @@ export default function Home() {
               className="bg-neutral-800 outline outline-primary text-primary px-2 text-sm w-full"
               placeholder="es. Mario"
               value={playerName}
+              maxLength={8}
               onChange={e => setPlayerName(e.target.value)}
             />
             <p className="text-primary-dim text-[0.45rem] uppercase mt-1">Verrà mostrato agli altri giocatori</p>
