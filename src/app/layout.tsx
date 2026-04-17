@@ -19,6 +19,7 @@ const pressStart = Press_Start_2P({
 export const metadata: Metadata = {
   title: "Arcade Darts",
   description: "Real-time multiplayer darts game",
+  metadataBase: new URL('https://darts.palozz.com'),
   openGraph: {
     title: "Arcade Darts",
     description: "Real-time multiplayer darts game",
