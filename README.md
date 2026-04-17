@@ -22,8 +22,8 @@ Arcade Darts is a real-time multiplayer darts game built with Next.js and Ably. 
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/your-username/arcade-darts.git
-cd arcade-darts
+git clone https://github.com/frapalozz/Arcade-Darts.git
+cd Arcade-Darts
 ```
 2. Install dependencies:
 
