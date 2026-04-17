@@ -102,11 +102,20 @@ export default function GameComponent({
             <div className="bg-neutral-800 p-3 rounded mb-4">
                 <h2 className="text-xs uppercase text-gray-400">Turno di {game.currentPlayer.name}</h2>
                 <div className="flex flex-wrap gap-2 mt-1">
-                    {game.currentTurnThrows.map((t, i) => (
+                    {game.currentTurnThrows.map((t, i) => {
+                        let point = 0;
+                        if(!t.isMiss) {
+                            if(t.multiplier === Multiplier.BULLSEYE || t.multiplier === Multiplier.DOUBLE_BULLSEYE) {
+                                point = t.multiplier === Multiplier.BULLSEYE ? 25 : 50;
+                            } else {
+                                point = t.sector!;
+                            }
+                        }
+                        return (
                         <div key={i} className="bg-black px-2 py-1 rounded text-xs sm:text-sm font-mono">
-                            {t.isMiss ? '❌ Miss' : `${t.sector}${t.multiplier === Multiplier.DOUBLE ? 'D' : t.multiplier === Multiplier.TRIPLE ? 'T' : ''}`}
+                            {t.isMiss ? '❌ Miss' : `${point}${t.multiplier === Multiplier.DOUBLE ? 'D' : t.multiplier === Multiplier.TRIPLE ? 'T' : ''}${t.multiplier === Multiplier.BULLSEYE ? "🐂" : t.multiplier === Multiplier.DOUBLE_BULLSEYE ? "🐂🐂" : ""}`}
                         </div>
-                    ))}
+                    )})}
                     {game.currentTurnThrows.length === 0 && <span className="text-xs text-gray-500">Nessun tiro ancora</span>}
                 </div>
             </div>

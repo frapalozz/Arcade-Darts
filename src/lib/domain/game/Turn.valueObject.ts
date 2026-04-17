@@ -21,7 +21,7 @@ export class Turn {
     public addThrow(sector: number | null, multiplier: Multiplier): Throw | null {
         if (this.throws.length >= this.maxThrows) return null;
         let points = 0;
-        if (sector === null) {
+        if (sector === null || multiplier === Multiplier.BULLSEYE || multiplier === Multiplier.DOUBLE_BULLSEYE) {
             // Bullseye
             points = multiplier === Multiplier.DOUBLE_BULLSEYE ? 50 : 25;
         } else {
