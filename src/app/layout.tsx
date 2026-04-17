@@ -20,7 +20,9 @@ export const metadata: Metadata = {
   title: "Arcade Darts",
   description: "Real-time multiplayer darts game",
   openGraph: {
-    images: "/og-image.jpg"
+    title: "Arcade Darts",
+    description: "Real-time multiplayer darts game",
+    siteName: "Arcade Darts"
   }
 };
 
