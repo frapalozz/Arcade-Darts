@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Realtime } from 'ably';
 import { Game, GameSnapshot } from '../lib/domain/game/Game.aggregate';
 import { Multiplier } from '../lib/domain/game/Turn.valueObject';
+import { storage } from '@/utils/storage';
 
 const STORAGE_KEY_PREFIX = 'game_snapshot_';
 const TTL = 30 * 60 * 1000; // 30 minuti
@@ -36,7 +37,7 @@ export function useGameSync(
             timestamp: Date.now()
         };
         try {
-            localStorage.setItem(getStorageKey(), JSON.stringify(data));
+            storage.setItem(getStorageKey(), JSON.stringify(data));
             console.log('💾 Game state saved to localStorage');
         } catch (err) {
             console.warn('Failed to save game to localStorage', err);
@@ -45,12 +46,12 @@ export function useGameSync(
 
     // Helper: carica lo stato da localStorage se valido (non scaduto)
     const loadGameFromLocalStorage = (): Game | null => {
-        const raw = localStorage.getItem(getStorageKey());
+        const raw = storage.getItem(getStorageKey());
         if (!raw) return null;
         try {
             const { snapshot, timestamp } = JSON.parse(raw);
             if (Date.now() - timestamp > TTL) {
-                localStorage.removeItem(getStorageKey());
+                storage.removeItem(getStorageKey());
                 return null;
             }
             console.log('📀 Restored game from localStorage');
@@ -63,7 +64,7 @@ export function useGameSync(
 
     // Helper: cancella lo stato salvato
     const clearGameFromLocalStorage = () => {
-        localStorage.removeItem(getStorageKey());
+        storage.removeItem(getStorageKey());
         console.log('🗑️ Cleared game from localStorage');
     };
 
