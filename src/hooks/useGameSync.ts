@@ -3,6 +3,9 @@ import { Realtime } from 'ably';
 import { Game, GameSnapshot } from '../lib/domain/game/Game.aggregate';
 import { Multiplier } from '../lib/domain/game/Turn.valueObject';
 
+const STORAGE_KEY_PREFIX = 'game_snapshot_';
+const TTL = 30 * 60 * 1000; // 30 minuti
+
 export function useGameSync(
   roomId: string,
   playerId: string,
@@ -13,21 +16,76 @@ export function useGameSync(
     const [players, setPlayers] = useState<{ playerId: string; playerName: string }[]>([]);
     const [isReady, setIsReady] = useState(false);
 
-    const ablyRef = useRef<Realtime | null>(null); // Alby always updated
-    const channelRef = useRef<any>(null); // Channell always updated
-    const gameRef = useRef<Game | null>(null); // Game always updated
+    const ablyRef = useRef<Realtime | null>(null);
+    const channelRef = useRef<any>(null);
+    const gameRef = useRef<Game | null>(null);
 
     const snapshotRequested = useRef(false);
     const isInitialized = useRef(false);
-    const addedPlayer = useRef(false); // evita di aggiungere il giocatore due volte
+    const addedPlayer = useRef(false);
+    const prevPlayersLengthRef = useRef(0);
 
-    // Update gameRef
+    // Helper: chiave univoca per la room
+    const getStorageKey = () => `${STORAGE_KEY_PREFIX}${roomId}`;
+
+    // Helper: salva lo stato su localStorage
+    const saveGameToLocalStorage = (game: Game) => {
+        if (!game) return;
+        const snapshot = game.snapshot;
+        const data = {
+            snapshot,
+            timestamp: Date.now()
+        };
+        try {
+            localStorage.setItem(getStorageKey(), JSON.stringify(data));
+            console.log('💾 Game state saved to localStorage');
+        } catch (err) {
+            console.warn('Failed to save game to localStorage', err);
+        }
+    };
+
+    // Helper: carica lo stato da localStorage se valido (non scaduto)
+    const loadGameFromLocalStorage = (): Game | null => {
+        const raw = localStorage.getItem(getStorageKey());
+        if (!raw) return null;
+        try {
+            const { snapshot, timestamp } = JSON.parse(raw);
+            if (Date.now() - timestamp > TTL) {
+                // Scaduto -> cancella
+                localStorage.removeItem(getStorageKey());
+                return null;
+            }
+            console.log('📀 Restored game from localStorage');
+            return Game.fromState(snapshot);
+        } catch (err) {
+            console.warn('Failed to parse saved game', err);
+            return null;
+        }
+    };
+
+    // Helper: cancella lo stato salvato
+    const clearGameFromLocalStorage = () => {
+        localStorage.removeItem(getStorageKey());
+        console.log('🗑️ Cleared game from localStorage');
+    };
+
+    // Aggiorna il ref del game
     useEffect(() => {
         gameRef.current = game;
     }, [game]);
 
+    // Salva automaticamente quando tutti i giocatori (non spettatori) se ne vanno
+    useEffect(() => {
+        // Solo se c'è un gioco e siamo passati da almeno un giocatore a zero
+        if (players.length === 0 && prevPlayersLengthRef.current > 0 && gameRef.current) {
+            console.log('💿 Last player left, saving game state');
+            saveGameToLocalStorage(gameRef.current);
+        }
+        prevPlayersLengthRef.current = players.length;
+    }, [players]);
+
     // =====================================
-    // Init ably
+    // Init Ably
     // =====================================
     useEffect(() => {
         let isMounted = true;
@@ -87,10 +145,9 @@ export function useGameSync(
             setTimeout(() => {
                 if (!gameRef.current && !isSpectator && snapshotRequested.current) {
                     console.log("⚠️ Nessuno ha risposto, creo io la partita");
-
                     const newGame = Game.start(roomId, [{ id: playerId, name: playerName }], 501);
                     setGame(newGame);
-
+                    clearGameFromLocalStorage(); // nuova partita -> cancella vecchio salvataggio
                     channel.publish('snapshot', { snapshot: newGame.snapshot });
                 }
                 snapshotRequested.current = false;
@@ -178,16 +235,27 @@ export function useGameSync(
                 const existingPlayer = playersOnly.find((m: any) => m.data.playerId === playerId);
                 
                 if (playersOnly.length === 0 && !isSpectator) {
-                // Nessun giocatore presente: crea nuova partita
-                const newGame = Game.start(roomId, [{ id: playerId, name: playerName }], 501);
-                setGame(newGame);
-                channel.publish('snapshot', { snapshot: newGame.snapshot });
+                    // Nessun giocatore presente: prova a caricare da localStorage
+                    const savedGame = loadGameFromLocalStorage();
+                    if (savedGame) {
+                        console.log('🔄 Restoring saved game');
+                        setGame(savedGame);
+                        gameRef.current = savedGame;
+                        // Pubblica lo snapshot per eventuali altri client che si uniscono in contemporanea
+                        channel.publish('snapshot', { snapshot: savedGame.snapshot });
+                    } else {
+                        console.log('🆕 No saved game, creating new one');
+                        const newGame = Game.start(roomId, [{ id: playerId, name: playerName }], 501);
+                        setGame(newGame);
+                        clearGameFromLocalStorage(); // assicura che non ci siano residui
+                        channel.publish('snapshot', { snapshot: newGame.snapshot });
+                    }
                 } else if (!isSpectator) {
-                // Richiedi snapshot per ottenere lo stato attuale
-                requestSnapshot();
-                // Non inviamo add-player automaticamente, verrà fatto da onSnapshot se necessario
+                    // Ci sono già giocatori: richiedi snapshot normale
+                    requestSnapshot();
                 } else {
-                requestSnapshot();
+                    // Spettatore: richiede snapshot
+                    requestSnapshot();
                 }
             };
             init();
