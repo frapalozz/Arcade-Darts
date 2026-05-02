@@ -23,15 +23,14 @@ export function useGameSync(
     const snapshotRequested = useRef(false);
     const isInitialized = useRef(false);
     const addedPlayer = useRef(false);
-    const prevPlayersLengthRef = useRef(0);
 
     // Helper: chiave univoca per la room
     const getStorageKey = () => `${STORAGE_KEY_PREFIX}${roomId}`;
 
-    // Helper: salva lo stato su localStorage
-    const saveGameToLocalStorage = (game: Game) => {
-        if (!game) return;
-        const snapshot = game.snapshot;
+    // Helper: salva lo stato su localStorage (chiamato dopo ogni azione)
+    const saveGameToLocalStorage = (gameToSave: Game) => {
+        if (!gameToSave) return;
+        const snapshot = gameToSave.snapshot;
         const data = {
             snapshot,
             timestamp: Date.now()
@@ -51,7 +50,6 @@ export function useGameSync(
         try {
             const { snapshot, timestamp } = JSON.parse(raw);
             if (Date.now() - timestamp > TTL) {
-                // Scaduto -> cancella
                 localStorage.removeItem(getStorageKey());
                 return null;
             }
@@ -73,16 +71,6 @@ export function useGameSync(
     useEffect(() => {
         gameRef.current = game;
     }, [game]);
-
-    // Salva automaticamente quando tutti i giocatori (non spettatori) se ne vanno
-    useEffect(() => {
-        // Solo se c'è un gioco e siamo passati da almeno un giocatore a zero
-        if (players.length === 0 && prevPlayersLengthRef.current > 0 && gameRef.current) {
-            console.log('💿 Last player left, saving game state');
-            saveGameToLocalStorage(gameRef.current);
-        }
-        prevPlayersLengthRef.current = players.length;
-    }, [players]);
 
     // =====================================
     // Init Ably
@@ -147,7 +135,8 @@ export function useGameSync(
                     console.log("⚠️ Nessuno ha risposto, creo io la partita");
                     const newGame = Game.start(roomId, [{ id: playerId, name: playerName }], 501);
                     setGame(newGame);
-                    clearGameFromLocalStorage(); // nuova partita -> cancella vecchio salvataggio
+                    saveGameToLocalStorage(newGame); // salva subito
+                    clearGameFromLocalStorage(); // eventuale residuo sovrascritto
                     channel.publish('snapshot', { snapshot: newGame.snapshot });
                 }
                 snapshotRequested.current = false;
@@ -169,7 +158,7 @@ export function useGameSync(
         channel.presence.enter({ playerId, playerName, isSpectator });
 
         // =====================================
-        // Event Handlers
+        // Event Handlers (ogni modifica salva su localStorage)
         // =====================================
         const onThrow = (msg: any) => {
             if (!gameRef.current) return;
@@ -177,6 +166,7 @@ export function useGameSync(
             try {
                 const newGame = gameRef.current.recordThrow(throwerId, sector, multiplier, isMiss);
                 setGame(newGame);
+                saveGameToLocalStorage(newGame);
             } catch (err) {
                 console.warn('Throw ignored', err);
             }
@@ -186,6 +176,7 @@ export function useGameSync(
             if (!gameRef.current) return;
             const newGame = gameRef.current.endTurn();
             setGame(newGame);
+            saveGameToLocalStorage(newGame);
         };
 
         const onAddPlayer = (msg: any) => {
@@ -193,6 +184,7 @@ export function useGameSync(
             try {
                 const newGame = gameRef.current.addPlayer(msg.data.playerName, msg.data.playerId);
                 setGame(newGame);
+                saveGameToLocalStorage(newGame);
                 channel.publish('snapshot', { snapshot: newGame.snapshot });
             } catch (err) {
                 console.warn('Add player ignored', err);
@@ -210,7 +202,7 @@ export function useGameSync(
             const snapshot = msg.data.snapshot as GameSnapshot;
             const newGame = Game.fromState(snapshot);
             setGame(newGame);
-            // Dopo aver ricevuto lo snapshot, verifica se il giocatore attuale è già nella partita
+            saveGameToLocalStorage(newGame); // salva anche lo snapshot ricevuto
             const playerInGame = snapshot.players.some(p => p.id === playerId);
             if (!playerInGame && !isSpectator && !addedPlayer.current) {
                 addedPlayer.current = true;
@@ -232,10 +224,8 @@ export function useGameSync(
             const init = async () => {
                 const members = await channel.presence.get();
                 const playersOnly = members.filter((m: any) => !m.data.isSpectator);
-                const existingPlayer = playersOnly.find((m: any) => m.data.playerId === playerId);
                 
                 if (playersOnly.length === 0 && !isSpectator) {
-                    // Nessun giocatore presente: prova a caricare da localStorage
                     const savedGame = loadGameFromLocalStorage();
                     if (savedGame) {
                         console.log('🔄 Restoring saved game');
@@ -243,18 +233,18 @@ export function useGameSync(
                         gameRef.current = savedGame;
                         // Pubblica lo snapshot per eventuali altri client che si uniscono in contemporanea
                         channel.publish('snapshot', { snapshot: savedGame.snapshot });
+                        // Non serve salvare di nuovo, era già salvato
                     } else {
                         console.log('🆕 No saved game, creating new one');
                         const newGame = Game.start(roomId, [{ id: playerId, name: playerName }], 501);
                         setGame(newGame);
+                        saveGameToLocalStorage(newGame);
                         clearGameFromLocalStorage(); // assicura che non ci siano residui
                         channel.publish('snapshot', { snapshot: newGame.snapshot });
                     }
                 } else if (!isSpectator) {
-                    // Ci sono già giocatori: richiedi snapshot normale
                     requestSnapshot();
                 } else {
-                    // Spettatore: richiede snapshot
                     requestSnapshot();
                 }
             };
