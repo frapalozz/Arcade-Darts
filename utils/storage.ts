@@ -2,6 +2,7 @@ export const storage = {
   setItem: (key: string, value: string): boolean => {
     try {
       localStorage.setItem(key, value);
+      sessionStorage.setItem(key, value);
       return true;
     } catch {
       try {
