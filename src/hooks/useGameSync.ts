@@ -104,7 +104,7 @@ export function useGameSync(roomId: string, playerId: string, playerName: string
 
   // 👑 Play winner sound when the game winner appears (or changes)
   useEffect(() => {
-    if (game?.winner && game.winner !== prevWinnerRef.current) {
+    if (game?.winner && game.winner.id !== prevWinnerRef.current) {
       // Play winner sound
       playSound(SOUND_WINNER, false);
 
@@ -133,7 +133,7 @@ export function useGameSync(roomId: string, playerId: string, playerName: string
         });
       }, 200);
 
-      prevWinnerRef.current = game.winner;
+      prevWinnerRef.current = game.winner.id;
     } else if (!game?.winner) {
       prevWinnerRef.current = null;
     }
