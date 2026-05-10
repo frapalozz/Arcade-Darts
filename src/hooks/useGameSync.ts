@@ -7,19 +7,6 @@ import { storage } from '@/utils/storage';
 const STORAGE_KEY_PREFIX = 'game_snapshot_';
 const TTL = 30 * 60 * 1000; // 30 minuti
 
-// ---------- Sound helper ----------
-const playSound = (type: 'throw' | 'win') => {
-  if (typeof window === 'undefined' || typeof Audio === 'undefined') return;
-  const src = type === 'throw' ? '/sounds/throw.mp3' : '/sounds/win.mp3';
-  try {
-    const audio = new Audio(src);
-    audio.play().catch(err => console.warn(`Sound could not be played: ${err}`));
-  } catch (err) {
-    console.warn('Audio creation failed', err);
-  }
-};
-// ---------------------------------
-
 export function useGameSync(
   roomId: string,
   playerId: string,
@@ -37,8 +24,6 @@ export function useGameSync(
     const snapshotRequested = useRef(false);
     const isInitialized = useRef(false);
     const addedPlayer = useRef(false);
-    const winSoundPlayed = useRef(false);        // prevents repeated win sounds
-    const initialGameWinnerRef = useRef<string | null>(null); // detect new winner on mount
 
     // Helper: chiave univoca per la room
     const getStorageKey = () => `${STORAGE_KEY_PREFIX}${roomId}`;
@@ -86,27 +71,6 @@ export function useGameSync(
     // Aggiorna il ref del game
     useEffect(() => {
         gameRef.current = game;
-    }, [game]);
-
-    // Monitor winner changes to play win sound (only once per game)
-    useEffect(() => {
-        if (!game) return;
-        const winnerId = game.winner;
-        if (winnerId && !winSoundPlayed.current) {
-            // Avoid playing win sound on initial load if the game already had a winner before this session
-            if (initialGameWinnerRef.current === null) {
-                // This is the first time we see a winner after mount => play sound
-                playSound('win');
-                winSoundPlayed.current = true;
-            } else if (initialGameWinnerRef.current !== winnerId) {
-                // Winner changed (should not happen in normal flow, but play anyway)
-                playSound('win');
-                winSoundPlayed.current = true;
-            }
-        } else if (!winnerId) {
-            // Reset flag if game resets (e.g., new game after win) – optional, depends on your domain
-            winSoundPlayed.current = false;
-        }
     }, [game]);
 
     // =====================================
@@ -172,8 +136,8 @@ export function useGameSync(
                     console.log("⚠️ Nessuno ha risposto, creo io la partita");
                     const newGame = Game.start(roomId, [{ id: playerId, name: playerName }], 501);
                     setGame(newGame);
-                    saveGameToLocalStorage(newGame);
-                    clearGameFromLocalStorage();
+                    saveGameToLocalStorage(newGame); // salva subito
+                    clearGameFromLocalStorage(); // eventuale residuo sovrascritto
                     channel.publish('snapshot', { snapshot: newGame.snapshot });
                 }
                 snapshotRequested.current = false;
@@ -204,8 +168,6 @@ export function useGameSync(
                 const newGame = gameRef.current.recordThrow(throwerId, sector, multiplier, isMiss);
                 setGame(newGame);
                 saveGameToLocalStorage(newGame);
-                // Play sound for the throw (including own throws)
-                playSound('throw');
             } catch (err) {
                 console.warn('Throw ignored', err);
             }
@@ -241,7 +203,7 @@ export function useGameSync(
             const snapshot = msg.data.snapshot as GameSnapshot;
             const newGame = Game.fromState(snapshot);
             setGame(newGame);
-            saveGameToLocalStorage(newGame);
+            saveGameToLocalStorage(newGame); // salva anche lo snapshot ricevuto
             const playerInGame = snapshot.players.some(p => p.id === playerId);
             if (!playerInGame && !isSpectator && !addedPlayer.current) {
                 addedPlayer.current = true;
@@ -268,19 +230,17 @@ export function useGameSync(
                     const savedGame = loadGameFromLocalStorage();
                     if (savedGame) {
                         console.log('🔄 Restoring saved game');
-                        // Store initial winner to avoid win sound on restore
-                        initialGameWinnerRef.current = savedGame.winner ?? null;
-                        if (savedGame.winner) winSoundPlayed.current = true; // suppress win sound on load
                         setGame(savedGame);
                         gameRef.current = savedGame;
+                        // Pubblica lo snapshot per eventuali altri client che si uniscono in contemporanea
                         channel.publish('snapshot', { snapshot: savedGame.snapshot });
+                        // Non serve salvare di nuovo, era già salvato
                     } else {
                         console.log('🆕 No saved game, creating new one');
                         const newGame = Game.start(roomId, [{ id: playerId, name: playerName }], 501);
-                        initialGameWinnerRef.current = null;
                         setGame(newGame);
                         saveGameToLocalStorage(newGame);
-                        clearGameFromLocalStorage();
+                        clearGameFromLocalStorage(); // assicura che non ci siano residui
                         channel.publish('snapshot', { snapshot: newGame.snapshot });
                     }
                 } else if (!isSpectator) {
