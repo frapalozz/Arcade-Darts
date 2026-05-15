@@ -10,7 +10,7 @@ const TTL = 30 * 60 * 1000; // 30 minuti
 
 // Sound assets – replace with your actual file paths
 const SOUND_GAME_START = "/sounds/game-start.mp3";
-const SOUNDS_THROW = ["/sounds/throw.mp3", "/sounds/throw2.mp3", "/sounds/throw3.mp3"];
+const SOUNDS_THROW = ["/sounds/throw.mp3", "/sounds/throw2.mp3", "/sounds/throw3.mp3", "/sounds/kame.mp3", "/sounds/mario.mp3", "/sounds/ooo.mp3", "/sounds/tsts.mp3", "/sounds/catush.mp3", "/sounds/ee.mp3"];
 const NICE_DONE = "/sounds/nice-done.mp3";
 const SOUND_WINNER = "/sounds/winner.mp3";
 
