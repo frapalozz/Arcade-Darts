@@ -4,6 +4,7 @@ import { Game } from '../src/lib/domain/game/Game.aggregate';
 import { Multiplier as M } from '../src/lib/domain/game/Turn.valueObject';
 import { GameSyncEngine, ChannelLike, ConnectionLike, ChannelMessage, PresenceMember, SyncStatus } from '../src/lib/infrastructure/sync/GameSyncEngine';
 import { LocalGameStore } from '../src/lib/infrastructure/persistence/LocalGameStore';
+import { summarizeRooms, PresenceGameInfo } from '../src/lib/application/rooms/RoomSummary';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const FAST = { snapshotRetryMs: 25, snapshotAttempts: 2, spectatorRetryMs: 60, saveDebounceMs: 5, publishTimeoutMs: 200, outboxRetryMs: 20 };
@@ -46,6 +47,7 @@ class FakeClient implements ChannelLike, ConnectionLike {
     }
     presence = {
         enter: async (data?: unknown) => { this.presenceData = data; this.broker.presenceEvent({ clientId: this.id, action: 'enter', data }); },
+        update: async (data?: unknown) => { this.presenceData = data; this.broker.presenceEvent({ clientId: this.id, action: 'update', data }); },
         get: async () => this.broker.clients.filter((c) => c.connState === 'connected' && c.presenceData).map((c) => ({ clientId: c.id, data: c.presenceData })),
         subscribe: (l: (m: PresenceMember) => void) => { this.presenceListeners.add(l); },
         unsubscribe: (l: (m: PresenceMember) => void) => { this.presenceListeners.delete(l); },
@@ -177,4 +179,32 @@ test('snapshot salvato corrotto o scaduto viene ignorato', async () => {
     // formato legacy ancora valido viene migrato
     old.setItem('game_snapshot_room', JSON.stringify({ snapshot: Game.start('room', [{ id: 'x', name: 'X' }]).snapshot, timestamp: Date.now() }));
     assert.ok(new LocalGameStore('room', old).loadGame());
+});
+
+test('la presenza pubblica il riepilogo della partita (lista partite) e lo tiene aggiornato', async () => {
+    const b = new Broker();
+    const info = (c: FakeClient) => (c.presenceData as { game?: PresenceGameInfo }).game;
+    const rooms = () =>
+        summarizeRooms([{ roomId: 'room', members: b.clients.filter((c) => c.presenceData).map((c) => ({ clientId: c.id, data: c.presenceData })) }], 'a');
+
+    const a = peer(b, 'a'); a.engine.start(); await sleep(80);
+    assert.equal(info(a.client)!.started, false);
+    assert.equal(info(a.client)!.players.length, 1);
+    assert.equal(rooms()[0].status, 'waiting');
+
+    const c = peer(b, 'c'); c.engine.start(); await sleep(200);
+    assert.equal(info(a.client)!.players.length, 2);
+    assert.equal(rooms()[0].players.length, 2);
+
+    a.engine.recordThrow(20, M.SINGLE, false); await sleep(60);
+    assert.equal(info(a.client)!.started, true);
+    assert.equal(rooms()[0].status, 'playing');
+    assert.equal(rooms()[0].currentPlayerName, 'A');
+    assert.equal(rooms()[0].players.find((p) => p.name === 'A')!.score, 481);
+    assert.equal(rooms()[0].mine, true);
+
+    // gli spettatori non pubblicano il riepilogo e sono contati a parte
+    const s = peer(b, 's', { spectator: true }); s.engine.start(); await sleep(150);
+    assert.equal(info(s.client), undefined);
+    assert.equal(rooms()[0].spectators, 1);
 });

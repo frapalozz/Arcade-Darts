@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect, type FormEvent } from "react";
 import slugify from 'slugify'
 import { storage } from '@/utils/storage';
+import RoomList from '@/src/components/RoomList';
 
 const toSlug = (value: string) =>
   slugify(value.trim(), { lower: true, trim: true, replacement: "-" });
@@ -13,11 +14,14 @@ export default function Home() {
   const [lobbyId, setLobbyId] = useState('');
   const [playerName, setPlayerName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // undefined = non ancora letto (lato server/primo render); null = nessun id salvato
+  const [storedPlayerId, setStoredPlayerId] = useState<string | null | undefined>(undefined);
   const router = useRouter();
 
   useEffect(() => {
     const savedName = storage.getItem('playerName');
     if (savedName) setPlayerName(savedName);
+    setStoredPlayerId(storage.getItem('playerId'));
   }, []);
 
   const saveNameAndNavigate = (slug: string, mode?: string) => {
@@ -27,6 +31,8 @@ export default function Home() {
     }
     if (!playerName.trim()) {
       setError("Inserisci il tuo nome per giocare.");
+      // Chi preme "Partecipa" dalla lista in fondo alla pagina deve vedere subito cosa manca
+      document.getElementById('player-name')?.focus();
       return;
     }
     setError(null);
@@ -50,6 +56,9 @@ export default function Home() {
     if (!lobbyId.trim()) return setError("Inserisci il codice della lobby.");
     saveNameAndNavigate(toSlug(lobbyId), 'spectator');
   };
+
+  const joinFromList = (slug: string) => saveNameAndNavigate(slug);
+  const watchFromList = (slug: string) => saveNameAndNavigate(slug, 'spectator');
 
   return (
     <main className="flex-1 flex flex-col items-center justify-center gap-6 sm:gap-8 px-4 pt-safe pb-safe py-8 w-full max-w-4xl mx-auto">
@@ -169,6 +178,9 @@ export default function Home() {
           </div>
         </form>
       </div>
+
+      {/* Partite in attesa / in corso */}
+      <RoomList playerId={storedPlayerId} onJoin={joinFromList} onWatch={watchFromList} />
     </main>
   );
 }

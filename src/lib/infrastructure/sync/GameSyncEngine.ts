@@ -1,6 +1,7 @@
 import { Game, GameSnapshot } from '../../domain/game/Game.aggregate';
 import { Multiplier } from '../../domain/game/Turn.valueObject';
 import { LocalGameStore, OutboxItem } from '../persistence/LocalGameStore';
+import { toPresenceGameInfo } from '../../application/rooms/RoomSummary';
 
 /* ------------------------------------------------------------------ */
 /* Interfacce minime di Ably (sottoinsieme usato): permettono i test   */
@@ -25,6 +26,8 @@ export interface ChannelLike {
     off(event: string, listener: (change: { resumed?: boolean }) => void): unknown;
     presence: {
         enter(data?: unknown): Promise<unknown>;
+        /** Opzionale: se presente, il riepilogo della partita viene pubblicato nella presenza (lista partite). */
+        update?(data?: unknown): Promise<unknown>;
         get(params?: { waitForSync?: boolean }): Promise<PresenceMember[]>;
         subscribe(listener: (m: PresenceMember) => void): unknown;
         unsubscribe(listener: (m: PresenceMember) => void): unknown;
@@ -137,6 +140,7 @@ export class GameSyncEngine {
     private stopped = false;
     private flushing = false;
     private networkOnline = true;
+    private presenceKey = '';
 
     private members = new Map<string, { playerId: string; playerName: string; isSpectator: boolean }>();
     private timers = new Set<ReturnType<typeof setTimeout>>();
@@ -489,6 +493,26 @@ export class GameSyncEngine {
         this.game = game;
         this.o.handlers.onGame(game);
         this.scheduleSave();
+        this.syncPresence();
+    }
+
+    /**
+     * Pubblica nella presenza un riepilogo della partita (punteggi, iniziata o no…): è ciò che permette alla
+     * home di elencare le partite aperte. Solo i giocatori, e solo a stato allineato: uno stato appena
+     * ripristinato dal salvataggio locale non è ancora una fonte affidabile. Si invia solo se è cambiato.
+     */
+    private syncPresence(): void {
+        const { channel, isSpectator, playerId, playerName } = this.o;
+        const game = this.game;
+        if (this.stopped || isSpectator || !game || !this.synced || typeof channel.presence.update !== 'function') return;
+        const info = toPresenceGameInfo(game.snapshot);
+        const key = JSON.stringify(info);
+        if (key === this.presenceKey) return;
+        this.presenceKey = key;
+        channel.presence.update({ playerId, playerName, isSpectator: false, game: info }).catch(() => {
+            // non consegnato (rete assente): al prossimo cambio di stato/connessione si riprova
+            if (this.presenceKey === key) this.presenceKey = '';
+        });
     }
 
     /* ------------------------------ Invio con coda locale ------------------------------ */
@@ -561,6 +585,7 @@ export class GameSyncEngine {
                       : 'offline'
                   : 'offline';
         this.o.handlers.onStatus({ connection, pending: this.outbox.length, synced: this.synced });
+        this.syncPresence();
     }
 
     private emitPlayers(): void {

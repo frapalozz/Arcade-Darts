@@ -3,6 +3,7 @@ Arcade Darts is a real-time multiplayer darts game built with Next.js and Ably. 
 ## ✨ Features
 - **Real-time multiplayer** – Every throw, turn end, and player join is instantly synced.
 - **Spectator mode** – Watch live games without participating.
+- **Open games list** – The home page lists the games waiting to start or in progress (players, scores, whose turn it is, spectators) and lets you join as a player, watch as a spectator, or resume a game you are already part of. It refreshes automatically.
 - **Presence** – See who’s currently in the room.
 - **Next.js** API route – Secure token generation for Ably.
 - **Offline resilience** – The game state and any not-yet-delivered action are saved in the browser (`localStorage`). If the connection drops or the page is reloaded, the game reappears instantly, throws made while offline are queued and sent on reconnection, and the client re-syncs with the other players (duplicates are discarded by action id).
@@ -51,7 +52,7 @@ yarn dev
 Open http://localhost:3000 to play.
 
 ## 🧪 How to Play
-1. **Create or join a room** – Each game room has a unique ID (e.g., game:room123).
+1. **Create or join a room** – Each game room has a unique ID (e.g., game:room123). You can also pick one from the *Partite aperte* list on the home page.
 2. **Throw darts** – Click on the dartboard sectors to select a target, choose a multiplier (single, double, triple), or miss.
 3. **End your turn** – After three throws, the turn automatically ends (or manually via the “End Turn” button).
 4. **Bust** – Going below 0 (or, with double-out, finishing on 1 or with a non-double) cancels the whole turn: the score goes back to what it was when the turn started.
@@ -77,6 +78,8 @@ The project can be deployed to Vercel (recommended) or any platform that support
 |`ABLY_API_KEY`|Your Ably API key (root key is fine)|
 
 The API route `/api/ably-token` uses this key to generate a short-lived token for the client.
+
+The API route `/api/rooms` uses the same key to list the active `game:*` channels (Ably channel enumeration) and read who is present in each one. This needs the `channel-metadata` capability: a root key has it; if you use a restricted key, add `channel-metadata:*` and `presence` on `game:*`. Results are cached for a few seconds on the server.
 ## 🤝 Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 ## 📄 License
