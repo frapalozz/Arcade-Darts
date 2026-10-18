@@ -1,44 +1,49 @@
 "use client";
 import GameComponent from "@/src/components/GameComponent";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { generateUUID } from "@/utils/uuid";
+import { storage } from "@/utils/storage";
 
 export default function GamePage() {
-    const { roomId } = useParams();
+    const params = useParams<{ roomId: string | string[] }>();
+    const roomId = Array.isArray(params.roomId) ? params.roomId[0] : params.roomId;
     const searchParams = useSearchParams();
+    const router = useRouter();
     const isSpectatorParam = searchParams.get("mode") === "spectator";
-    
-    const [playerName, setPlayerName] = useState('');
-    const [playerId, setPlayerId] = useState<string | null>(null);
-    const [isReady, setIsReady] = useState(false);
+
+    // Identità letta una sola volta dopo il mount (localStorage non esiste lato server)
+    const [identity, setIdentity] = useState<{ playerId: string; playerName: string } | null>(null);
 
     useEffect(() => {
-        let storedId = localStorage.getItem('playerId');
+        const storedName = storage.getItem("playerName");
+        if (!storedName) {
+            // Nessun nome impostato: torna alla home
+            router.replace("/");
+            return;
+        }
+        let storedId = storage.getItem("playerId");
         if (!storedId) {
             storedId = generateUUID();
-            localStorage.setItem('playerId', storedId);
+            storage.setItem("playerId", storedId);
         }
-        setPlayerId(storedId);
+        setIdentity({ playerId: storedId, playerName: storedName });
+    }, [router]);
 
-        const storedName = localStorage.getItem('playerName');
-        if (storedName) {
-            setPlayerName(storedName);
-            setIsReady(true);
-        } else {
-            // Nessun nome impostato: torna alla home
-            window.location.href = '/';
-        }
-    }, []);
-
-    if (!isReady || !playerId) {
-        return <div className="text-white">Caricamento...</div>;
+    if (!identity) {
+        return (
+            <div className="flex-1 flex items-center justify-center p-6">
+                <p className="font-headline text-xs text-primary text-glow-primary animate-blink">Caricamento...</p>
+            </div>
+        );
     }
 
-    return <GameComponent 
-        roomId={roomId as string} 
-        playerName={playerName} 
-        playerId={playerId} 
-        isSpectator={isSpectatorParam} 
-    />;
+    return (
+        <GameComponent
+            roomId={roomId}
+            playerName={identity.playerName}
+            playerId={identity.playerId}
+            isSpectator={isSpectatorParam}
+        />
+    );
 }

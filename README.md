@@ -5,7 +5,7 @@ Arcade Darts is a real-time multiplayer darts game built with Next.js and Ably. 
 - **Spectator mode** – Watch live games without participating.
 - **Presence** – See who’s currently in the room.
 - **Next.js** API route – Secure token generation for Ably.
-> **Planned**: Automatic game recovery using Ably presence (game state persists when players temporarily disconnect).
+- **Offline resilience** – The game state and any not-yet-delivered action are saved in the browser (`localStorage`). If the connection drops or the page is reloaded, the game reappears instantly, throws made while offline are queued and sent on reconnection, and the client re-syncs with the other players (duplicates are discarded by action id).
 
 ## 🛠️ Tech Stack
 - Next.js – React framework for the frontend and API routes.
@@ -54,7 +54,14 @@ Open http://localhost:3000 to play.
 1. **Create or join a room** – Each game room has a unique ID (e.g., game:room123).
 2. **Throw darts** – Click on the dartboard sectors to select a target, choose a multiplier (single, double, triple), or miss.
 3. **End your turn** – After three throws, the turn automatically ends (or manually via the “End Turn” button).
-4. **Win** – The first player to reach exactly 0 points wins the game.
+4. **Bust** – Going below 0 (or, with double-out, finishing on 1 or with a non-double) cancels the whole turn: the score goes back to what it was when the turn started.
+5. **Win** – The first player to reach exactly 0 points wins. By default the standard *double-out* rule applies (the last dart must be a double or the bullseye); pass `doubleOut = false` to `Game.start` to disable it.
+
+## 🧪 Tests
+```bash
+npm test
+```
+Covers the game rules and the sync/offline logic (with an in-memory fake of the Ably channel).
 
 
 ## 🚀 Deployment

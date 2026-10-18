@@ -11,17 +11,18 @@ export class GameService {
     return Game.start(roomId, players, startingScore);
   }
 
+  // Game è immutabile: ogni operazione restituisce una nuova istanza, che è quella da usare e da cui leggere gli eventi.
   recordThrow(game: Game, playerId: string, sector: number | null, multiplier: Multiplier): Game {
-    game.recordThrow(playerId, sector, multiplier);
+    const next = game.recordThrow(playerId, sector, multiplier);
     // Pubblica tutti gli eventi generati
-    game.pullEvents().forEach(ev => this.eventBus.publish(ev));
-    return game;
+    next.pullEvents().forEach(ev => this.eventBus.publish(ev));
+    return next;
   }
 
   endTurn(game: Game): Game {
-    game.endTurn();
-    game.pullEvents().forEach(ev => this.eventBus.publish(ev));
-    return game;
+    const next = game.endTurn();
+    next.pullEvents().forEach(ev => this.eventBus.publish(ev));
+    return next;
   }
 
   getState(game: Game): GameStateDto {

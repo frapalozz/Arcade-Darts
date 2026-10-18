@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Press_Start_2P, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
@@ -27,6 +27,14 @@ export const metadata: Metadata = {
   }
 };
 
+// Necessario per un vero layout responsive su mobile (+ colore barra del browser e area sicura del notch)
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#050505",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -34,10 +42,10 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
-      className={`${pressStart.variable} ${spaceGrotesk.variable} font-headline h-full antialiased`}
+      lang="it"
+      className={`${pressStart.variable} ${spaceGrotesk.variable} font-body h-full antialiased`}
     >
-      <body className="min-h-full w-full flex flex-col bg-black">
+      <body className="min-h-dvh w-full flex flex-col">
         {children}
       </body>
     </html>
